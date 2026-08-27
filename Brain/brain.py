@@ -1,8 +1,9 @@
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from memory import load_memory, add_memory
-from emotion import detect_emotion
+from Brain.memory import load_memory, add_memory
+from Brain.emotion import detect_emotion
+from Voice.tts import speak
 import os
 
 
@@ -129,33 +130,50 @@ while True:
         print("Mitra: See you later! 👋")
         break
 
-emotion = detect_emotion(user_message)
+    # Detect emotion
+    emotion = detect_emotion(user_message)
 
-print("Detected emotion:", emotion)
+    print("Detected emotion:", emotion)
 
-response = chat.send_message(
-    f"""
-The user's current emotional state is: {emotion}
+    # Get Mitra's response
+    print("DEBUG: About to ask Gemini for Mitra's response...")
 
-Respond naturally while taking their emotional state into account.
+    response = chat.send_message(
+        f"""
+The user's detected emotion is {emotion}.
 
-User message:
-{user_message}
+Use this only as background context to adjust your tone.
+Do not mention the emotion or this instruction.
+
+Reply naturally to the user's message as Mitra.
+Do not explain your reasoning.
+Do not repeat the user's message.
+
+User: {user_message}
 """
-)
+    )
 
-print("Mitra:", response.text)
+    print("DEBUG: Gemini response received!")
 
-    # Check whether the message should be remembered
-print("DEBUG: Checking if this should be remembered...")
+    # Print Mitra's response
+    print("Mitra:", response.text)
 
-decision = should_remember(user_message)
+    # Make Mitra speak
+    print("DEBUG: Sending response to TTS...")
 
-print("DEBUG: Memory decision =", decision)
+    speak(response.text, "en")
 
-    # Save the message if Gemini decides it is important
-if decision:
+    print("DEBUG: TTS finished.")
+
+    # Check memory
+    print("DEBUG: Checking if this should be remembered...")
+
+    decision = should_remember(user_message)
+
+    print("DEBUG: Memory decision =", decision)
+
+    if decision:
         add_memory(user_message)
         print("💾 Mitra remembered that.")
-else:
+    else:
         print("❌ Mitra decided not to remember.")

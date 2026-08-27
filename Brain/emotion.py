@@ -34,10 +34,4 @@ Respond with ONLY the emotion name.
         contents=prompt
     )
 
-    return response.text.strip().upper()    
-
-message = input("You: ")
-
-emotion = detect_emotion(message)
-
-print("Detected emotion:", emotion)
+    return response.text.strip().upper() 
