@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from memory import load_memory, add_memory
+from emotion import detect_emotion
 import os
 
 
@@ -128,22 +129,33 @@ while True:
         print("Mitra: See you later! 👋")
         break
 
-    # Send message to Gemini
-    response = chat.send_message(user_message)
+emotion = detect_emotion(user_message)
 
-    # Display Mitra's response
-    print("Mitra:", response.text)
+print("Detected emotion:", emotion)
+
+response = chat.send_message(
+    f"""
+The user's current emotional state is: {emotion}
+
+Respond naturally while taking their emotional state into account.
+
+User message:
+{user_message}
+"""
+)
+
+print("Mitra:", response.text)
 
     # Check whether the message should be remembered
-    print("DEBUG: Checking if this should be remembered...")
+print("DEBUG: Checking if this should be remembered...")
 
-    decision = should_remember(user_message)
+decision = should_remember(user_message)
 
-    print("DEBUG: Memory decision =", decision)
+print("DEBUG: Memory decision =", decision)
 
     # Save the message if Gemini decides it is important
-    if decision:
+if decision:
         add_memory(user_message)
         print("💾 Mitra remembered that.")
-    else:
+else:
         print("❌ Mitra decided not to remember.")
