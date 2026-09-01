@@ -4,25 +4,26 @@ from google.genai import types
 
 from Brain.memory import load_memory, add_memory
 from NLP.nlp_module import detect_language, translate, detect_emotion
-from Voice.tts import speak
 
 import os
 
 
-# -------------------------------
+# =========================================================
 # LOAD ENVIRONMENT
-# -------------------------------
+# =========================================================
 
 load_dotenv()
 
 api_key = os.getenv("GEMINI_API_KEY")
 
-client = genai.Client(api_key=api_key)
+client = genai.Client(
+    api_key=api_key
+)
 
 
-# -------------------------------
+# =========================================================
 # MITRA'S PERSONALITY
-# -------------------------------
+# =========================================================
 
 mitra_personality = """
 You are Mitra, a friendly AI virtual companion.
@@ -42,9 +43,9 @@ Your goal is to make conversations feel natural, comfortable, and friendly.
 """
 
 
-# -------------------------------
+# =========================================================
 # DECIDE WHAT TO REMEMBER
-# -------------------------------
+# =========================================================
 
 def should_remember(message):
 
@@ -92,9 +93,9 @@ NO
     return response.text.strip().upper() == "YES"
 
 
-# -------------------------------
+# =========================================================
 # LOAD EXISTING MEMORY
-# -------------------------------
+# =========================================================
 
 memory = load_memory()
 
@@ -110,45 +111,75 @@ Do not reveal private information unnecessarily.
 """
 
 
-# -------------------------------
-# CREATE MITRA'S CHAT
-# -------------------------------
+# =========================================================
+# CREATE MITRA CHAT
+# =========================================================
 
 chat = client.chats.create(
     model="gemini-3.1-flash-lite",
     config=types.GenerateContentConfig(
-        system_instruction=mitra_personality + memory_context
+        system_instruction=
+        mitra_personality +
+        memory_context
     )
 )
 
 
-# -------------------------------
+# =========================================================
 # MAIN MITRA FUNCTION
-# -------------------------------
+# =========================================================
 
 def mitra_response(user_message):
     """
-    Process a user's message and return Mitra's response.
+    Process the user's message and return Mitra's response.
 
-    The GUI will call this function.
+    This function handles:
+    - Language detection
+    - Emotion detection
+    - Translation
+    - Gemini response generation
+    - Response translation
+    - Memory
+
+    TTS is intentionally NOT handled here.
+    The GUI controls speech playback.
     """
 
+    # -----------------------------------------------------
     # Detect language
-    language = detect_language(user_message)
+    # -----------------------------------------------------
 
+    language = detect_language(
+        user_message
+    )
+
+
+    # -----------------------------------------------------
     # Detect emotion
-    emotion = detect_emotion(user_message)
+    # -----------------------------------------------------
+
+    emotion = detect_emotion(
+        user_message
+    )
 
     emotion_label = emotion["label"]
 
-    # Translate user's message to English
+
+    # -----------------------------------------------------
+    # Translate user message to English
+    # -----------------------------------------------------
+
     english_message = translate(
         user_message,
         target_lang="en",
         source_lang=language
     )
 
+
+    # -----------------------------------------------------
     # Generate Mitra's response
+    # -----------------------------------------------------
+
     response = chat.send_message(
         f"""
 The user's emotional state is: {emotion_label}.
@@ -170,41 +201,83 @@ User message:
 
     mitra_text = response.text
 
+
+    # -----------------------------------------------------
     # Translate response back to user's language
+    # -----------------------------------------------------
+
     if language != "en":
+
         mitra_text = translate(
             mitra_text,
             target_lang=language,
             source_lang="en"
         )
 
-    # Speak the response
-    speak(mitra_text, language)
 
-    # Check memory
-    decision = should_remember(user_message)
+    # -----------------------------------------------------
+    # Check whether the message should be remembered
+    # -----------------------------------------------------
+
+    decision = should_remember(
+        user_message
+    )
 
     if decision:
-        add_memory(user_message)
 
-    # Return response to the GUI
-    return mitra_text
+        add_memory(
+            user_message
+        )
 
 
-# -------------------------------
+    # -----------------------------------------------------
+    # Return information to GUI
+    # -----------------------------------------------------
+
+    return {
+        "text": mitra_text,
+        "language": language,
+        "emotion": emotion_label
+    }
+
+
+# =========================================================
 # TERMINAL TEST MODE
-# -------------------------------
+# =========================================================
 
 if __name__ == "__main__":
 
     while True:
 
-        user_message = input("You: ")
+        user_message = input(
+            "You: "
+        )
 
         if user_message.lower() == "bye":
-            print("Mitra: See you later! 👋")
+
+            print(
+                "Mitra: See you later! 👋"
+            )
+
             break
 
-        response = mitra_response(user_message)
 
-        print("Mitra:", response)
+        result = mitra_response(
+            user_message
+        )
+
+
+        print(
+            "Mitra:",
+            result["text"]
+        )
+
+        print(
+            "Language:",
+            result["language"]
+        )
+
+        print(
+            "Emotion:",
+            result["emotion"]
+        )
