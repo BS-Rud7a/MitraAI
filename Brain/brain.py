@@ -1,13 +1,18 @@
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+
 from Brain.memory import load_memory, add_memory
 from NLP.nlp_module import detect_language, translate, detect_emotion
 from Voice.tts import speak
+
 import os
 
 
-# Load environment variables
+# -------------------------------
+# LOAD ENVIRONMENT
+# -------------------------------
+
 load_dotenv()
 
 api_key = os.getenv("GEMINI_API_KEY")
@@ -118,17 +123,15 @@ chat = client.chats.create(
 
 
 # -------------------------------
-# MAIN CONVERSATION LOOP
+# MAIN MITRA FUNCTION
 # -------------------------------
 
-while True:
+def mitra_response(user_message):
+    """
+    Process a user's message and return Mitra's response.
 
-    user_message = input("You: ")
-
-    # Exit the program
-    if user_message.lower() == "bye":
-        print("Mitra: See you later! 👋")
-        break
+    The GUI will call this function.
+    """
 
     # Detect language
     language = detect_language(user_message)
@@ -136,23 +139,19 @@ while True:
     # Detect emotion
     emotion = detect_emotion(user_message)
 
-    # Extract emotion label
     emotion_label = emotion["label"]
 
-    print("Language:", language)
-    print("Emotion:", emotion_label)
-
-    # Translate the user's message to English for processing
+    # Translate user's message to English
     english_message = translate(
         user_message,
         target_lang="en",
         source_lang=language
     )
 
-    # Ask Gemini for a response
+    # Generate Mitra's response
     response = chat.send_message(
         f"""
-The user's detected emotional state is: {emotion_label}.
+The user's emotional state is: {emotion_label}.
 
 The user originally wrote in language: {language}.
 
@@ -169,27 +168,43 @@ User message:
 """
     )
 
-    mitra_response = response.text
+    mitra_text = response.text
 
-    # Translate Mitra's response back to the user's language
+    # Translate response back to user's language
     if language != "en":
-        mitra_response = translate(
-            mitra_response,
+        mitra_text = translate(
+            mitra_text,
             target_lang=language,
             source_lang="en"
         )
 
-    # Display Mitra's response
-    print("Mitra:", mitra_response)
+    # Speak the response
+    speak(mitra_text, language)
 
-    # Speak the response in the user's language
-    speak(mitra_response, language)
-
-    # Check whether the message should be remembered
+    # Check memory
     decision = should_remember(user_message)
 
     if decision:
         add_memory(user_message)
-        print("💾 Mitra remembered that.")
-    else:
-        print("❌ Mitra decided not to remember.")
+
+    # Return response to the GUI
+    return mitra_text
+
+
+# -------------------------------
+# TERMINAL TEST MODE
+# -------------------------------
+
+if __name__ == "__main__":
+
+    while True:
+
+        user_message = input("You: ")
+
+        if user_message.lower() == "bye":
+            print("Mitra: See you later! 👋")
+            break
+
+        response = mitra_response(user_message)
+
+        print("Mitra:", response)
