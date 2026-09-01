@@ -1,8 +1,17 @@
 import sys
 import os
 
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import (
+    Qt,
+    QThread,
+    Signal,
+    QPropertyAnimation,
+    QEasingCurve,
+    QPoint
+)
+
 from PySide6.QtGui import QPixmap
+
 from PySide6.QtWidgets import (
     QApplication,
     QWidget,
@@ -30,7 +39,9 @@ class MitraWorker(QThread):
     error_occurred = Signal(str)
 
     def __init__(self, message):
+
         super().__init__()
+
         self.message = message
 
     def run(self):
@@ -192,7 +203,7 @@ class MitraWindow(QWidget):
         self.is_speaking = False
 
         # -------------------------------------------------
-        # Avatar images
+        # Avatar assets
         # -------------------------------------------------
 
         assets_path = os.path.join(
@@ -219,6 +230,14 @@ class MitraWindow(QWidget):
         }
 
         # -------------------------------------------------
+        # Avatar animation
+        # -------------------------------------------------
+
+        self.avatar_animation = None
+
+        self.avatar_base_position = None
+
+        # -------------------------------------------------
         # Setup
         # -------------------------------------------------
 
@@ -243,6 +262,11 @@ class MitraWindow(QWidget):
 
         self.speech_finished.connect(
             self.on_speech_finished
+        )
+
+        # Start idle animation
+        self.start_avatar_animation(
+            "idle"
         )
 
     # =====================================================
@@ -510,7 +534,7 @@ class MitraWindow(QWidget):
         )
 
         # -------------------------------------------------
-        # Avatar name
+        # Name
         # -------------------------------------------------
 
         name = QLabel(
@@ -534,7 +558,7 @@ class MitraWindow(QWidget):
         )
 
         # -------------------------------------------------
-        # Avatar status
+        # Status
         # -------------------------------------------------
 
         self.avatar_status = QLabel(
@@ -586,10 +610,6 @@ class MitraWindow(QWidget):
         chat_layout.setSpacing(
             0
         )
-
-        # -------------------------------------------------
-        # Chat title
-        # -------------------------------------------------
 
         chat_title = QLabel(
             "Conversation"
@@ -665,7 +685,7 @@ class MitraWindow(QWidget):
         )
 
         # =================================================
-        # WELCOME SCREEN
+        # WELCOME
         # =================================================
 
         self.welcome_widget = QWidget()
@@ -866,7 +886,7 @@ class MitraWindow(QWidget):
         )
 
     # =====================================================
-    # LOAD INITIAL AVATAR
+    # LOAD AVATAR
     # =====================================================
 
     def load_avatar(self):
@@ -876,7 +896,7 @@ class MitraWindow(QWidget):
         )
 
     # =====================================================
-    # CHANGE AVATAR STATE
+    # SET AVATAR STATE
     # =====================================================
 
     def set_avatar_state(
@@ -916,6 +936,89 @@ class MitraWindow(QWidget):
         self.avatar.setPixmap(
             pixmap
         )
+
+    # =====================================================
+    # AVATAR ANIMATION
+    # =====================================================
+
+    def start_avatar_animation(
+        self,
+        state
+    ):
+
+        # Stop existing animation
+        if self.avatar_animation:
+
+            self.avatar_animation.stop()
+
+        # Save the current position
+        if self.avatar_base_position is None:
+
+            self.avatar_base_position = (
+                self.avatar.pos()
+            )
+
+        base_position = (
+            self.avatar_base_position
+        )
+
+        # -------------------------------------------------
+        # Animation settings
+        # -------------------------------------------------
+
+        if state == "idle":
+
+            distance = 4
+            duration = 2400
+
+        elif state == "thinking":
+
+            distance = 6
+            duration = 1400
+
+        elif state == "speaking":
+
+            distance = 5
+            duration = 700
+
+        else:
+
+            distance = 4
+            duration = 2400
+
+        # -------------------------------------------------
+        # Create animation
+        # -------------------------------------------------
+
+        self.avatar_animation = QPropertyAnimation(
+            self.avatar,
+            b"pos"
+        )
+
+        self.avatar_animation.setDuration(
+            duration
+        )
+
+        self.avatar_animation.setStartValue(
+            base_position
+        )
+
+        self.avatar_animation.setEndValue(
+            QPoint(
+                base_position.x(),
+                base_position.y() - distance
+            )
+        )
+
+        self.avatar_animation.setEasingCurve(
+            QEasingCurve.InOutSine
+        )
+
+        self.avatar_animation.setLoopCount(
+            -1
+        )
+
+        self.avatar_animation.start()
 
     # =====================================================
     # SEND MESSAGE
@@ -967,10 +1070,14 @@ class MitraWindow(QWidget):
         )
 
         # -------------------------------------------------
-        # Change avatar to thinking
+        # Thinking state
         # -------------------------------------------------
 
         self.set_avatar_state(
+            "thinking"
+        )
+
+        self.start_avatar_animation(
             "thinking"
         )
 
@@ -1010,10 +1117,11 @@ class MitraWindow(QWidget):
     ):
 
         # -------------------------------------------------
-        # Get response information
+        # Extract data
         # -------------------------------------------------
 
         mitra_text = result["text"]
+
         language = result["language"]
 
         # -------------------------------------------------
@@ -1026,7 +1134,7 @@ class MitraWindow(QWidget):
         )
 
         # -------------------------------------------------
-        # Update status
+        # Preparing voice
         # -------------------------------------------------
 
         self.avatar_status.setText(
@@ -1058,7 +1166,6 @@ class MitraWindow(QWidget):
 
     def brain_finished(self):
 
-        # TTS controls the final state.
         pass
 
     # =====================================================
@@ -1069,8 +1176,11 @@ class MitraWindow(QWidget):
 
         self.is_speaking = True
 
-        # Change avatar
         self.set_avatar_state(
+            "speaking"
+        )
+
+        self.start_avatar_animation(
             "speaking"
         )
 
@@ -1094,8 +1204,11 @@ class MitraWindow(QWidget):
 
         self.is_speaking = False
 
-        # Return avatar to idle
         self.set_avatar_state(
+            "idle"
+        )
+
+        self.start_avatar_animation(
             "idle"
         )
 
@@ -1111,8 +1224,11 @@ class MitraWindow(QWidget):
 
         self.is_speaking = False
 
-        # Return avatar to idle
         self.set_avatar_state(
+            "idle"
+        )
+
+        self.start_avatar_animation(
             "idle"
         )
 
@@ -1150,6 +1266,10 @@ class MitraWindow(QWidget):
             "idle"
         )
 
+        self.start_avatar_animation(
+            "idle"
+        )
+
         self.avatar_status.setText(
             "● Voice error"
         )
@@ -1182,6 +1302,10 @@ class MitraWindow(QWidget):
             "idle"
         )
 
+        self.start_avatar_animation(
+            "idle"
+        )
+
         self.add_message(
             "Something went wrong. Please try again. 😕",
             False
@@ -1211,18 +1335,10 @@ class MitraWindow(QWidget):
         is_user
     ):
 
-        # -------------------------------------------------
-        # Bubble
-        # -------------------------------------------------
-
         bubble = ChatBubble(
             message,
             is_user
         )
-
-        # -------------------------------------------------
-        # Sender
-        # -------------------------------------------------
 
         sender = QLabel(
             "You" if is_user else "Mitra"
@@ -1247,10 +1363,6 @@ class MitraWindow(QWidget):
             sender.setAlignment(
                 Qt.AlignLeft
             )
-
-        # -------------------------------------------------
-        # Message column
-        # -------------------------------------------------
 
         message_column = QVBoxLayout()
 
@@ -1284,10 +1396,6 @@ class MitraWindow(QWidget):
             QSizePolicy.Minimum
         )
 
-        # -------------------------------------------------
-        # Message row
-        # -------------------------------------------------
-
         row = QHBoxLayout()
 
         row.setContentsMargins(
@@ -1319,18 +1427,10 @@ class MitraWindow(QWidget):
             row
         )
 
-        # -------------------------------------------------
-        # Add message
-        # -------------------------------------------------
-
         self.chat_layout.insertWidget(
             self.chat_layout.count() - 1,
             container
         )
-
-        # -------------------------------------------------
-        # Scroll down
-        # -------------------------------------------------
 
         QApplication.processEvents()
 
@@ -1371,6 +1471,10 @@ class MitraWindow(QWidget):
             "idle"
         )
 
+        self.start_avatar_animation(
+            "idle"
+        )
+
         self.avatar_status.setText(
             "● Ready to chat"
         )
@@ -1392,10 +1496,6 @@ class MitraWindow(QWidget):
     def apply_styles(self):
 
         self.setStyleSheet("""
-
-        /* =================================================
-           GLOBAL
-        ================================================= */
 
         QWidget {
             background-color: #0B0D11;
@@ -1443,7 +1543,7 @@ class MitraWindow(QWidget):
 
 
         /* =================================================
-           CLEAR BUTTON
+           CLEAR
         ================================================= */
 
         #clearButton {
@@ -1467,7 +1567,7 @@ class MitraWindow(QWidget):
 
 
         /* =================================================
-           AVATAR PANEL
+           AVATAR
         ================================================= */
 
         #avatarPanel {
@@ -1507,7 +1607,7 @@ class MitraWindow(QWidget):
 
 
         /* =================================================
-           CHAT PANEL
+           CHAT
         ================================================= */
 
         #chatPanel {
@@ -1528,7 +1628,7 @@ class MitraWindow(QWidget):
 
 
         /* =================================================
-           SCROLL AREA
+           SCROLL
         ================================================= */
 
         #scrollArea {
@@ -1575,7 +1675,7 @@ class MitraWindow(QWidget):
 
 
         /* =================================================
-           SENDER LABELS
+           SENDERS
         ================================================= */
 
         #userSender {
