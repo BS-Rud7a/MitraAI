@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from Brain.memory import load_memory, add_memory
-from Brain.emotion import detect_emotion
+from NLP.nlp_module import detect_language, translate, detect_emotion
 from Voice.tts import speak
 import os
 
@@ -130,47 +130,63 @@ while True:
         print("Mitra: See you later! 👋")
         break
 
+    # Detect language
+    language = detect_language(user_message)
+
     # Detect emotion
     emotion = detect_emotion(user_message)
 
-    print("Detected emotion:", emotion)
+    # Extract emotion label
+    emotion_label = emotion["label"]
 
-    # Get Mitra's response
-    print("DEBUG: About to ask Gemini for Mitra's response...")
+    print("Language:", language)
+    print("Emotion:", emotion_label)
 
+    # Translate the user's message to English for processing
+    english_message = translate(
+        user_message,
+        target_lang="en",
+        source_lang=language
+    )
+
+    # Ask Gemini for a response
     response = chat.send_message(
         f"""
-The user's detected emotion is {emotion}.
+The user's detected emotional state is: {emotion_label}.
 
-Use this only as background context to adjust your tone.
-Do not mention the emotion or this instruction.
+The user originally wrote in language: {language}.
 
-Reply naturally to the user's message as Mitra.
+Use the emotional information only to adjust your tone.
+Do not mention the emotion detection.
+Do not mention translation.
+
+Reply naturally as Mitra.
+Keep the response friendly and conversational.
 Do not explain your reasoning.
-Do not repeat the user's message.
 
-User: {user_message}
+User message:
+{english_message}
 """
     )
 
-    print("DEBUG: Gemini response received!")
+    mitra_response = response.text
 
-    # Print Mitra's response
-    print("Mitra:", response.text)
+    # Translate Mitra's response back to the user's language
+    if language != "en":
+        mitra_response = translate(
+            mitra_response,
+            target_lang=language,
+            source_lang="en"
+        )
 
-    # Make Mitra speak
-    print("DEBUG: Sending response to TTS...")
+    # Display Mitra's response
+    print("Mitra:", mitra_response)
 
-    speak(response.text, "en")
+    # Speak the response in the user's language
+    speak(mitra_response, language)
 
-    print("DEBUG: TTS finished.")
-
-    # Check memory
-    print("DEBUG: Checking if this should be remembered...")
-
+    # Check whether the message should be remembered
     decision = should_remember(user_message)
-
-    print("DEBUG: Memory decision =", decision)
 
     if decision:
         add_memory(user_message)
