@@ -22,10 +22,17 @@ from PySide6.QtWidgets import (
     QPushButton,
     QFrame,
     QScrollArea,
-    QSizePolicy
+    QSizePolicy,
+    QDialog,
+    QComboBox,
+    QCheckBox,
+    QFormLayout,
+    QDialogButtonBox,
+    QTextEdit
 )
 
 from Brain.brain import mitra_response
+from Brain.memory import load_memory
 from Voice.tts import speak, set_speech_callbacks
 from stt import speech_to_text
 
@@ -211,6 +218,358 @@ class ChatBubble(QFrame):
             QSizePolicy.Maximum,
             QSizePolicy.Minimum
         )
+
+
+# =========================================================
+# SETTINGS WINDOW
+# =========================================================
+
+class SettingsDialog(QDialog):
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("Mitra Settings")
+        self.setFixedSize(420, 410)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(28, 24, 28, 24)
+        layout.setSpacing(18)
+
+        title = QLabel("Mitra Settings")
+        title.setObjectName("settingsTitle")
+
+        subtitle = QLabel("Customize how Mitra behaves.")
+        subtitle.setObjectName("settingsSubtitle")
+
+        layout.addWidget(title)
+        layout.addWidget(subtitle)
+        layout.addSpacing(8)
+
+        form = QFormLayout()
+        form.setHorizontalSpacing(20)
+        form.setVerticalSpacing(16)
+
+        language = QComboBox()
+        language.addItem("Auto", None)
+        language.addItem("English", "en")
+        language.addItem("Hindi / Hinglish", "hi")
+        language.setCurrentIndex(0)
+        language.setFixedHeight(38)
+
+        voice = QComboBox()
+        voice.addItem("F1")
+        voice.setFixedHeight(38)
+
+        memory = QCheckBox("Remember important things")
+        memory.setChecked(True)
+
+        self.view_memories_button = QPushButton(
+            "View Memories"
+        )
+
+        self.view_memories_button.setObjectName(
+            "viewMemoriesButton"
+        )
+
+        self.view_memories_button.setFixedHeight(
+            38
+        )
+
+        self.view_memories_button.clicked.connect(
+            self.view_memories
+        )
+
+        form.addRow("Voice input:", language)
+        form.addRow("Voice:", voice)
+        form.addRow("Memory:", memory)
+        form.addRow("", self.view_memories_button)
+
+        layout.addLayout(form)
+        layout.addStretch()
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(self.reject)
+        buttons.accepted.connect(self.accept)
+
+        layout.addWidget(buttons)
+
+        self.setLayout(layout)
+
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #0B0D11;
+                color: #F3F4F6;
+            }
+
+            QLabel#settingsTitle {
+                background-color: transparent;
+                color: #F3F4F6;
+                font-size: 22px;
+                font-weight: 600;
+            }
+
+            QLabel#settingsSubtitle {
+                background-color: transparent;
+                color: #747B88;
+                font-size: 12px;
+            }
+
+            QLabel {
+                background-color: transparent;
+                color: #A1A7B2;
+                font-size: 13px;
+            }
+
+            QComboBox {
+                background-color: #171A20;
+                color: #F3F4F6;
+                border: 1px solid #2A2F38;
+                border-radius: 10px;
+                padding: 0 10px;
+            }
+
+            QComboBox:hover {
+                border-color: #414752;
+            }
+
+            QComboBox QAbstractItemView {
+                background-color: #171A20;
+                color: #F3F4F6;
+                selection-background-color: #303640;
+            }
+
+            QCheckBox {
+                background-color: transparent;
+                color: #A1A7B2;
+                font-size: 13px;
+            }
+
+            QPushButton#viewMemoriesButton {
+                background-color: #242932;
+                color: #F0F1F3;
+                border: 1px solid #2D323C;
+                border-radius: 10px;
+                padding: 8px 14px;
+                font-size: 12px;
+            }
+
+            QPushButton#viewMemoriesButton:hover {
+                background-color: #303640;
+                border-color: #414752;
+            }
+
+            QPushButton#viewMemoriesButton:pressed {
+                background-color: #3A404B;
+            }
+
+            QDialogButtonBox QPushButton {
+                background-color: #242932;
+                color: #F0F1F3;
+                border: none;
+                border-radius: 10px;
+                padding: 8px 18px;
+            }
+
+            QDialogButtonBox QPushButton:hover {
+                background-color: #303640;
+            }
+        """)
+
+
+    # =====================================================
+    # VIEW MEMORIES
+    # =====================================================
+
+    def view_memories(self):
+
+        try:
+
+            memory = load_memory()
+
+            facts = memory.get(
+                "facts",
+                []
+            )
+
+            user_name = memory.get(
+                "user_name",
+                ""
+            ).strip()
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle(
+                "Mitra Memories"
+            )
+            dialog.setFixedSize(
+                520,
+                500
+            )
+
+            layout = QVBoxLayout()
+            layout.setContentsMargins(
+                28,
+                24,
+                28,
+                24
+            )
+            layout.setSpacing(
+                14
+            )
+
+            title = QLabel(
+                "Mitra's Memories"
+            )
+            title.setObjectName(
+                "memoryTitle"
+            )
+
+            subtitle = QLabel(
+                "Things Mitra currently remembers."
+            )
+            subtitle.setObjectName(
+                "memorySubtitle"
+            )
+
+            layout.addWidget(
+                title
+            )
+
+            layout.addWidget(
+                subtitle
+            )
+
+            if user_name:
+
+                name_label = QLabel(
+                    f"Name: {user_name}"
+                )
+
+                name_label.setObjectName(
+                    "memoryName"
+                )
+
+                layout.addWidget(
+                    name_label
+                )
+
+            memory_text = QTextEdit()
+            memory_text.setReadOnly(
+                True
+            )
+            memory_text.setObjectName(
+                "memoryText"
+            )
+
+            if facts:
+
+                lines = []
+
+                for index, fact in enumerate(
+                    facts,
+                    start=1
+                ):
+
+                    lines.append(
+                        f"• {fact}"
+                    )
+
+                memory_text.setPlainText(
+                    "\n\n".join(lines)
+                )
+
+            else:
+
+                memory_text.setPlainText(
+                    "Mitra hasn't saved any facts yet."
+                )
+
+            layout.addWidget(
+                memory_text
+            )
+
+            close_button = QPushButton(
+                "Close"
+            )
+
+            close_button.setFixedHeight(
+                38
+            )
+
+            close_button.clicked.connect(
+                dialog.accept
+            )
+
+            layout.addWidget(
+                close_button
+            )
+
+            dialog.setLayout(
+                layout
+            )
+
+            dialog.setStyleSheet("""
+                QDialog {
+                    background-color: #0B0D11;
+                    color: #F3F4F6;
+                }
+
+                QLabel {
+                    background-color: transparent;
+                }
+
+                QLabel#memoryTitle {
+                    color: #F3F4F6;
+                    font-size: 22px;
+                    font-weight: 600;
+                }
+
+                QLabel#memorySubtitle {
+                    color: #747B88;
+                    font-size: 12px;
+                }
+
+                QLabel#memoryName {
+                    color: #A1A7B2;
+                    font-size: 13px;
+                }
+
+                QTextEdit#memoryText {
+                    background-color: #171A20;
+                    color: #F3F4F6;
+                    border: 1px solid #2A2F38;
+                    border-radius: 12px;
+                    padding: 12px;
+                    font-size: 13px;
+                }
+
+                QPushButton {
+                    background-color: #242932;
+                    color: #F0F1F3;
+                    border: 1px solid #2D323C;
+                    border-radius: 10px;
+                    padding: 8px 18px;
+                    font-size: 12px;
+                }
+
+                QPushButton:hover {
+                    background-color: #303640;
+                    border-color: #414752;
+                }
+
+                QPushButton:pressed {
+                    background-color: #3A404B;
+                }
+            """)
+
+            dialog.exec()
+
+        except Exception as error:
+
+            print(
+                "Memory viewer error:",
+                error
+            )
 
 
 # =========================================================
@@ -447,6 +806,27 @@ class MitraWindow(QWidget):
 
         header_layout.addWidget(
             self.clear_button
+        )
+
+        self.settings_button = QPushButton(
+            "⚙"
+        )
+
+        self.settings_button.setObjectName(
+            "settingsButton"
+        )
+
+        self.settings_button.setFixedSize(
+            42,
+            42
+        )
+
+        self.settings_button.clicked.connect(
+            self.open_settings
+        )
+
+        header_layout.addWidget(
+            self.settings_button
         )
 
         header.setLayout(
@@ -936,6 +1316,21 @@ class MitraWindow(QWidget):
         self.message_input.returnPressed.connect(
             self.send_message
         )
+
+
+    # =====================================================
+    # SETTINGS
+    # =====================================================
+
+    def open_settings(self):
+
+        if self.is_speaking or self.is_listening:
+            return
+
+        dialog = SettingsDialog(self)
+
+        dialog.exec()
+
 
     # =====================================================
     # LOAD AVATAR
@@ -1776,6 +2171,28 @@ class MitraWindow(QWidget):
         }
 
         #clearButton:pressed {
+            background-color: #242932;
+        }
+
+        /* =================================================
+           SETTINGS
+        ================================================= */
+
+        #settingsButton {
+            background-color: transparent;
+            color: #858B96;
+            border: 1px solid #2D323C;
+            border-radius: 10px;
+            font-size: 18px;
+        }
+
+        #settingsButton:hover {
+            background-color: #1B1F27;
+            color: #F3F4F6;
+            border-color: #414752;
+        }
+
+        #settingsButton:pressed {
             background-color: #242932;
         }
 

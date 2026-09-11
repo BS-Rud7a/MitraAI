@@ -23,5 +23,3 @@ def add_memory(fact):
     memory = load_memory()
     memory["facts"].append(fact)
     save_memory(memory)
-
-

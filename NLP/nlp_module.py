@@ -58,6 +58,79 @@ _emotion_classifier = None
 
 
 # =========================================================
+# ROMAN HINDI / HINGLISH NORMALIZATION
+# =========================================================
+
+# Whisper can produce slightly inconsistent Roman spellings
+# for common Hindi words, for example:
+#     aura  -> aur
+#     batAo -> batao
+#     tuma  -> tum
+#
+# This lightweight layer normalizes only common, high-confidence
+# variants. It does NOT try to rewrite arbitrary English text.
+
+_HINGLISH_NORMALIZATION = {
+    # Common Whisper variants
+    "aura": "aur",
+    "batAo": "batao",
+    "bataao": "batao",
+    "batao": "batao",
+    "tuma": "tum",
+    "tumha": "tum",
+    "kaise": "kaise",
+    "kaisa": "kaisa",
+    "kaisi": "kaisi",
+
+    # Common alternate Roman spellings
+    "acha": "accha",
+    "achha": "accha",
+    "accha": "accha",
+    "nhi": "nahi",
+    "nahi": "nahi",
+    "nahin": "nahin",
+    "kyu": "kyun",
+    "kyo": "kyun",
+    "kyon": "kyun",
+    "toh": "toh",
+    "mai": "main",
+    "me": "mein",
+    "m": "main",
+}
+
+
+def normalize_hinglish(text: str) -> str:
+    """
+    Normalize common Roman-Hindi/Hinglish variants produced by STT.
+
+    The function is intentionally conservative: it only changes
+    complete words and leaves unknown words untouched.
+    """
+
+    if not text:
+        return text
+
+    import re
+
+    def replace_word(match):
+        word = match.group(0)
+        normalized = _HINGLISH_NORMALIZATION.get(
+            word.lower()
+        )
+
+        if normalized is None:
+            return word
+
+        return normalized
+
+    return re.sub(
+        r"[A-Za-z]+",
+        replace_word,
+        text
+    )
+
+
+# =========================================================
 # HINGLISH DETECTION
 # =========================================================
 
@@ -121,6 +194,8 @@ _HINGLISH_WORDS = {
 
 
 def _looks_like_hinglish(text: str) -> bool:
+
+    text = normalize_hinglish(text)
 
     words = (
         text
@@ -291,11 +366,13 @@ def detect_language(text: str) -> str:
     langdetect does not reliably recognize Hinglish.
     """
 
-    if _looks_like_hinglish(text):
+    normalized_text = normalize_hinglish(text)
+
+    if _looks_like_hinglish(normalized_text):
 
         return "hi"
 
-    if _looks_like_english(text):
+    if _looks_like_english(normalized_text):
 
         return "en"
 
@@ -518,6 +595,12 @@ def translate_for_mitra(
             text
         )
 
+    # Normalize Roman Hindi before any Hindi translation.
+    # This improves inputs coming from Whisper STT.
+    if source_lang == "hi":
+
+        text = normalize_hinglish(text)
+
     # -----------------------------------------------------
     # Nothing to translate
     # -----------------------------------------------------
@@ -648,6 +731,8 @@ if __name__ == "__main__":
 
         "I failed my exam today.",
 
+        "aura batAo tuma kaise ho",
+
         "Mujhe aaj bahut bura lag raha hai.",
 
         "Estoy muy feliz hoy.",
@@ -666,6 +751,10 @@ if __name__ == "__main__":
 
         print(
             f"Text: {sample}"
+        )
+
+        print(
+            f"Normalized: {normalize_hinglish(sample)}"
         )
 
         lang = detect_language(
