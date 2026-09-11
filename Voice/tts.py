@@ -18,7 +18,7 @@ tts = TTS(auto_download=True)
 # =========================================================
 
 voice = tts.get_voice_style(
-    voice_name="F1"
+    voice_name="M1"
 )
 
 
