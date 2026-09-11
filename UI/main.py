@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 
 from Brain.brain import mitra_response
 from Voice.tts import speak, set_speech_callbacks
+from stt import speech_to_text
 
 
 # =========================================================
@@ -101,6 +102,34 @@ class TTSWorker(QThread):
         finally:
 
             self.finished.emit()
+
+
+# =========================================================
+# STT WORKER
+# =========================================================
+
+class STTWorker(QThread):
+
+    transcription_ready = Signal(object)
+    error_occurred = Signal(str)
+
+    def __init__(self, language="en"):
+
+        super().__init__()
+
+        self.language = language
+
+    def run(self):
+
+        try:
+
+            result = speech_to_text(self.language)
+
+            self.transcription_ready.emit(result)
+
+        except Exception as error:
+
+            self.error_occurred.emit(str(error))
 
 
 # =========================================================
@@ -199,8 +228,10 @@ class MitraWindow(QWidget):
 
         self.worker = None
         self.tts_worker = None
+        self.stt_worker = None
 
         self.is_speaking = False
+        self.is_listening = False
 
         # -------------------------------------------------
         # Avatar assets
@@ -827,6 +858,19 @@ class MitraWindow(QWidget):
             "Write something to Mitra..."
         )
 
+        self.mic_button = QPushButton(
+            "🎤"
+        )
+
+        self.mic_button.setObjectName(
+            "micButton"
+        )
+
+        self.mic_button.setFixedSize(
+            50,
+            50
+        )
+
         self.send_button = QPushButton(
             "➤"
         )
@@ -842,6 +886,10 @@ class MitraWindow(QWidget):
 
         input_layout.addWidget(
             self.message_input
+        )
+
+        input_layout.addWidget(
+            self.mic_button
         )
 
         input_layout.addWidget(
@@ -879,6 +927,10 @@ class MitraWindow(QWidget):
 
         self.send_button.clicked.connect(
             self.send_message
+        )
+
+        self.mic_button.clicked.connect(
+            self.start_listening
         )
 
         self.message_input.returnPressed.connect(
@@ -1021,16 +1073,162 @@ class MitraWindow(QWidget):
         self.avatar_animation.start()
 
     # =====================================================
+    # START LISTENING
+    # =====================================================
+
+    def start_listening(self):
+
+        if self.is_speaking or self.is_listening:
+            return
+
+        self.is_listening = True
+
+        self.message_input.setEnabled(False)
+        self.send_button.setEnabled(False)
+        self.mic_button.setEnabled(False)
+
+        self.set_avatar_state(
+            "speaking"
+        )
+
+        self.start_avatar_animation(
+            "speaking"
+        )
+
+        self.avatar_status.setText(
+            "● Listening..."
+        )
+
+        self.stt_worker = STTWorker(
+            None
+        )
+
+        self.stt_worker.transcription_ready.connect(
+            self.receive_transcription
+        )
+
+        self.stt_worker.error_occurred.connect(
+            self.handle_stt_error
+        )
+
+        self.stt_worker.finished.connect(
+            self.stt_finished
+        )
+
+        self.stt_worker.start()
+
+    # =====================================================
+    # RECEIVE TRANSCRIPTION
+    # =====================================================
+
+    def receive_transcription(self, result):
+
+        if not result:
+            return
+
+        message = result.get(
+            "text", ""
+        ).strip()
+
+        if not message:
+            return
+
+        self.send_message(
+            message
+        )
+
+    # =====================================================
+    # STT FINISHED
+    # =====================================================
+
+    def stt_finished(self):
+
+        self.is_listening = False
+
+        # If the transcription was sent to the Brain, keep
+        # the existing thinking state until the Brain finishes.
+        if self.worker is not None and self.worker.isRunning():
+
+            return
+
+        self.set_avatar_state(
+            "idle"
+        )
+
+        self.start_avatar_animation(
+            "idle"
+        )
+
+        self.avatar_status.setText(
+            "● Ready to chat"
+        )
+
+        self.message_input.setEnabled(
+            True
+        )
+
+        self.send_button.setEnabled(
+            True
+        )
+
+        self.mic_button.setEnabled(
+            True
+        )
+
+    # =====================================================
+    # STT ERROR
+    # =====================================================
+
+    def handle_stt_error(self, error):
+
+        print(
+            "STT error:",
+            error
+        )
+
+        self.is_listening = False
+
+        self.set_avatar_state(
+            "idle"
+        )
+
+        self.start_avatar_animation(
+            "idle"
+        )
+
+        self.avatar_status.setText(
+            "● Microphone error"
+        )
+
+        self.message_input.setEnabled(
+            True
+        )
+
+        self.send_button.setEnabled(
+            True
+        )
+
+        self.mic_button.setEnabled(
+            True
+        )
+
+    # =====================================================
     # SEND MESSAGE
     # =====================================================
 
-    def send_message(self):
+    def send_message(self, message=None):
 
-        message = (
-            self.message_input
-            .text()
-            .strip()
-        )
+        if message is None:
+
+            message = (
+                self.message_input
+                .text()
+                .strip()
+            )
+
+        else:
+
+            message = message.strip()
 
         if not message:
 
@@ -1066,6 +1264,10 @@ class MitraWindow(QWidget):
         )
 
         self.send_button.setEnabled(
+            False
+        )
+
+        self.mic_button.setEnabled(
             False
         )
 
@@ -1244,6 +1446,10 @@ class MitraWindow(QWidget):
             True
         )
 
+        self.mic_button.setEnabled(
+            True
+        )
+
         self.message_input.setFocus()
 
     # =====================================================
@@ -1279,6 +1485,10 @@ class MitraWindow(QWidget):
         )
 
         self.send_button.setEnabled(
+            True
+        )
+
+        self.mic_button.setEnabled(
             True
         )
 
@@ -1320,6 +1530,10 @@ class MitraWindow(QWidget):
         )
 
         self.send_button.setEnabled(
+            True
+        )
+
+        self.mic_button.setEnabled(
             True
         )
 
@@ -1753,6 +1967,32 @@ class MitraWindow(QWidget):
 
         #messageInput::placeholder {
             color: #626975;
+        }
+
+
+        /* =================================================
+           MICROPHONE BUTTON
+        ================================================= */
+
+        #micButton {
+            background-color: #242932;
+            color: #F0F1F3;
+            border: none;
+            border-radius: 14px;
+            font-size: 19px;
+        }
+
+        #micButton:hover {
+            background-color: #303640;
+        }
+
+        #micButton:pressed {
+            background-color: #3A404B;
+        }
+
+        #micButton:disabled {
+            background-color: #191C22;
+            color: #555B65;
         }
 
 
