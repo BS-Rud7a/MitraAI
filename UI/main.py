@@ -874,7 +874,7 @@ class MitraWindow(QWidget):
         )
 
         avatar_layout.setAlignment(
-            Qt.AlignTop
+            Qt.AlignCenter
         )
 
         greeting = QLabel(
@@ -926,6 +926,11 @@ class MitraWindow(QWidget):
             Qt.AlignCenter
         )
 
+        self.avatar.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Expanding
+        )
+
         self.load_avatar()
 
         avatar_card_layout.addWidget(
@@ -936,8 +941,12 @@ class MitraWindow(QWidget):
             avatar_card_layout
         )
 
+        avatar_card.setFixedWidth(390)
+
         avatar_layout.addWidget(
-            avatar_card
+            avatar_card,
+            0,
+            Qt.AlignHCenter
         )
 
         avatar_layout.addSpacing(
